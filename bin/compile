@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# fail fast
+set -euo pipefail
+
+curl2() {
+  curl --silent --retry 3 --location --proto '=https' "$@"
+}
+
+# shellcheck disable=SC1091
+source /dev/stdin <<< "$(curl2 https://lang-common.s3.amazonaws.com/buildpack-stdlib/v4/stdlib.sh)"
+
+build_dir=$1
+cache_dir=$2
+url='https://github.com/grafana/agent/releases/download/v0.18.1/agent-linux-amd64.zip'
+
+puts_step "Downloading and installing Grafana Agent"
+
+curl2 "$url" > grafana-agent.zip
+unzip grafana-agent.zip
+rm grafana-agent.zip
+rm -rf "$build_dir/.grafana-agent"
+mkdir -p "$build_dir/.grafana-agent/bin"
+mv agent-linux-amd64 "$build_dir/.grafana-agent/bin/grafana-agent"
+
+puts_step 'Installing profile.d script'
+mkdir -p "$build_dir/.profile.d"
+cat <<'EOF' > "$build_dir/.profile.d/grafana-agent.sh"
+export PATH="$PATH:$HOME/.grafana-agent/bin"
+EOF
+
+"$build_dir"/.grafana-agent/bin/grafana-agent --version
+puts_step 'Grafana Agent installation done'
